@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   createInvite,
@@ -21,21 +21,26 @@ import type { ChatMessage, User } from "../types";
 
 const TOKEN_KEY = "uchat_token";
 
-function readSessionToken(): string | null {
+function initialSessionToken(): string | null {
   if (typeof window === "undefined") return null;
-  const sp = new URLSearchParams(window.location.search);
-  const fromUrl = sp.get("token");
+  const params = new URLSearchParams(window.location.search);
+  const fromUrl = params.get("token");
   if (fromUrl) {
-    localStorage.setItem(TOKEN_KEY, fromUrl);
-    window.history.replaceState(null, "", window.location.pathname);
-    return fromUrl;
+    const t = decodeURIComponent(fromUrl);
+    localStorage.setItem(TOKEN_KEY, t);
+    console.log("Token stored from URL:", t);
+    const u = new URL(window.location.href);
+    u.searchParams.delete("token");
+    const path = u.pathname + (u.search ? u.search : "") + u.hash;
+    window.history.replaceState(null, document.title, path);
+    return t;
   }
   return localStorage.getItem(TOKEN_KEY);
 }
 
 export function ChatPage() {
   const navigate = useNavigate();
-  const token = useMemo(() => readSessionToken(), []);
+  const [token] = useState<string | null>(() => initialSessionToken());
   const [me, setMe] = useState<User | null>(null);
   const [peerEmail, setPeerEmail] = useState("");
   const [peer, setPeer] = useState<User | null>(null);
