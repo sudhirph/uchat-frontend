@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   createInvite,
@@ -21,26 +21,28 @@ import type { ChatMessage, User } from "../types";
 
 const TOKEN_KEY = "uchat_token";
 
-function initialSessionToken(): string | null {
-  if (typeof window === "undefined") return null;
-  const params = new URLSearchParams(window.location.search);
-  const fromUrl = params.get("token");
-  if (fromUrl) {
-    const t = decodeURIComponent(fromUrl);
-    localStorage.setItem(TOKEN_KEY, t);
-    console.log("Token stored from URL:", t);
-    const u = new URL(window.location.href);
-    u.searchParams.delete("token");
-    const path = u.pathname + (u.search ? u.search : "") + u.hash;
-    window.history.replaceState(null, document.title, path);
-    return t;
-  }
-  return localStorage.getItem(TOKEN_KEY);
-}
-
 export function ChatPage() {
   const navigate = useNavigate();
-  const [token] = useState<string | null>(() => initialSessionToken());
+  const [ready, setReady] = useState(false);
+  const [token, setToken] = useState<string | null>(null);
+
+  useLayoutEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const fromUrl = params.get("token");
+    if (fromUrl) {
+      const t = decodeURIComponent(fromUrl);
+      localStorage.setItem(TOKEN_KEY, t);
+      console.log("Token stored from URL:", t);
+      const u = new URL(window.location.href);
+      u.searchParams.delete("token");
+      const path = u.pathname + (u.search ? u.search : "") + u.hash;
+      window.history.replaceState(null, document.title, path);
+      setToken(t);
+    } else {
+      setToken(localStorage.getItem(TOKEN_KEY));
+    }
+    setReady(true);
+  }, []);
   const [me, setMe] = useState<User | null>(null);
   const [peerEmail, setPeerEmail] = useState("");
   const [peer, setPeer] = useState<User | null>(null);
@@ -97,6 +99,7 @@ export function ChatPage() {
   }, []);
 
   useEffect(() => {
+    if (!ready) return;
     if (!token) {
       navigate("/login", { replace: true });
       return;
@@ -117,10 +120,10 @@ export function ChatPage() {
       cancelled = true;
       wsRef.current?.close();
     };
-  }, [token, navigate, connectWs]);
+  }, [ready, token, navigate, connectWs]);
 
   useEffect(() => {
-    if (!me || !token) return;
+    if (!ready || !me || !token) return;
     const raw = sessionStorage.getItem(INVITE_PENDING_PEER_KEY);
     if (!raw) return;
     const peerId = parseInt(raw, 10);
@@ -147,10 +150,10 @@ export function ChatPage() {
     return () => {
       cancelled = true;
     };
-  }, [me, token]);
+  }, [ready, me, token]);
 
   useEffect(() => {
-    if (!me || !token || !peer) return;
+    if (!ready || !me || !token || !peer) return;
     let cancelled = false;
     (async () => {
       try {
@@ -163,7 +166,7 @@ export function ChatPage() {
     return () => {
       cancelled = true;
     };
-  }, [me, token, peer?.id]);
+  }, [ready, me, token, peer?.id]);
 
   const onPeerConnect = async () => {
     setError(null);
@@ -230,6 +233,10 @@ export function ChatPage() {
       setError("Couldn’t create a share link. Try again.");
     }
   };
+
+  if (!ready) {
+    return null;
+  }
 
   if (!me) {
     return (
