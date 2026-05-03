@@ -13,7 +13,7 @@ import {
   INVITE_PENDING_PEER_KEY,
   openWhatsAppShare,
 } from "../utils/invite";
-import { wsUrlForUser } from "../config";
+import { API_BASE_URL, wsUrlForUser } from "../config";
 import { ChatWindow } from "../components/ChatWindow";
 import { LanguageSelector } from "../components/LanguageSelector";
 import { MessageInput } from "../components/MessageInput";
@@ -25,14 +25,23 @@ export function ChatPage() {
   const navigate = useNavigate();
   const [ready, setReady] = useState(false);
   const [token, setToken] = useState<string | null>(null);
+  /** TEMP: ?token= for on-screen debug (remove after incident) */
+  const [debugUrlToken, setDebugUrlToken] = useState<string | null>(() =>
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("token")
+      : null
+  );
 
   useLayoutEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const fromUrl = params.get("token");
+    console.log("Token from URL:", fromUrl);
+    setDebugUrlToken(fromUrl);
     if (fromUrl) {
       const t = decodeURIComponent(fromUrl);
       localStorage.setItem(TOKEN_KEY, t);
       console.log("Token stored from URL:", t);
+      console.log("Token stored successfully (uchat_token)");
       const u = new URL(window.location.href);
       u.searchParams.delete("token");
       const path = u.pathname + (u.search ? u.search : "") + u.hash;
@@ -234,20 +243,54 @@ export function ChatPage() {
     }
   };
 
+  /* TEMP debug strip — remove after production incident */
+  const debugStrip = (
+    <div
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        width: "100%",
+        background: "black",
+        color: "lime",
+        padding: "8px",
+        fontSize: "12px",
+        zIndex: 9999,
+        wordBreak: "break-all",
+      }}
+    >
+      <div>API (VITE_API_BASE_URL): {String(import.meta.env.VITE_API_BASE_URL || "unset")}</div>
+      <div>API (resolved): {API_BASE_URL}</div>
+      <div>URL token (?token=): {debugUrlToken || "none"}</div>
+      <div>Stored access_token: {localStorage.getItem("access_token") || "none"}</div>
+      <div>Stored uchat_token: {localStorage.getItem(TOKEN_KEY) || "none"}</div>
+      <div>React token state: {token ? `${token.slice(0, 24)}…` : "none"}</div>
+      <div>ready: {String(ready)}</div>
+    </div>
+  );
+
   if (!ready) {
-    return null;
+    return (
+      <>
+        {debugStrip}
+      </>
+    );
   }
 
   if (!me) {
     return (
-      <div className="flex flex-1 items-center justify-center text-gray-400">
-        One moment…
-      </div>
+      <>
+        {debugStrip}
+        <div className="flex flex-1 items-center justify-center text-gray-400" style={{ paddingTop: 120 }}>
+          One moment…
+        </div>
+      </>
     );
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col" style={{ paddingTop: 120 }}>
+      {debugStrip}
       <header className="flex flex-shrink-0 flex-wrap items-center justify-between gap-3 border-b border-gray-800 bg-chat-panel px-4 py-3">
         <div>
           <h1 className="text-lg font-semibold text-white">UChat</h1>

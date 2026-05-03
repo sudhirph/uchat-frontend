@@ -2,6 +2,16 @@ import { API_BASE_URL } from "./config";
 import type { ChatMessage, User } from "./types";
 
 function authHeaders(token: string): HeadersInit {
+  /* TEMP debug — remove after incident */
+  console.log("API using Bearer token (arg):", token);
+  console.log(
+    "API localStorage access_token:",
+    localStorage.getItem("access_token") ? "present" : "none"
+  );
+  console.log(
+    "API localStorage uchat_token:",
+    localStorage.getItem("uchat_token") ? "present" : "none"
+  );
   return {
     Authorization: `Bearer ${token}`,
     "Content-Type": "application/json",
