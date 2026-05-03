@@ -23,7 +23,8 @@ const TOKEN_KEY = "uchat_token";
 
 export function ChatPage() {
   const navigate = useNavigate();
-  const [ready, setReady] = useState(false);
+  /** Session bootstrap finished (URL token read → localStorage, URL cleaned). */
+  const [authReady, setAuthReady] = useState(false);
   const [token, setToken] = useState<string | null>(null);
   /** TEMP: ?token= for on-screen debug (remove after incident) */
   const [debugUrlToken, setDebugUrlToken] = useState<string | null>(() =>
@@ -32,6 +33,7 @@ export function ChatPage() {
       : null
   );
 
+  /* Runs synchronously before paint and before any useEffect — avoids auth races */
   useLayoutEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const fromUrl = params.get("token");
@@ -50,7 +52,7 @@ export function ChatPage() {
     } else {
       setToken(localStorage.getItem(TOKEN_KEY));
     }
-    setReady(true);
+    setAuthReady(true);
   }, []);
   const [me, setMe] = useState<User | null>(null);
   const [peerEmail, setPeerEmail] = useState("");
@@ -108,7 +110,7 @@ export function ChatPage() {
   }, []);
 
   useEffect(() => {
-    if (!ready) return;
+    if (!authReady) return;
     if (!token) {
       navigate("/login", { replace: true });
       return;
@@ -129,10 +131,10 @@ export function ChatPage() {
       cancelled = true;
       wsRef.current?.close();
     };
-  }, [ready, token, navigate, connectWs]);
+  }, [authReady, token, navigate, connectWs]);
 
   useEffect(() => {
-    if (!ready || !me || !token) return;
+    if (!authReady || !me || !token) return;
     const raw = sessionStorage.getItem(INVITE_PENDING_PEER_KEY);
     if (!raw) return;
     const peerId = parseInt(raw, 10);
@@ -159,10 +161,10 @@ export function ChatPage() {
     return () => {
       cancelled = true;
     };
-  }, [ready, me, token]);
+  }, [authReady, me, token]);
 
   useEffect(() => {
-    if (!ready || !me || !token || !peer) return;
+    if (!authReady || !me || !token || !peer) return;
     let cancelled = false;
     (async () => {
       try {
@@ -175,7 +177,7 @@ export function ChatPage() {
     return () => {
       cancelled = true;
     };
-  }, [ready, me, token, peer?.id]);
+  }, [authReady, me, token, peer?.id]);
 
   const onPeerConnect = async () => {
     setError(null);
@@ -265,14 +267,17 @@ export function ChatPage() {
       <div>Stored access_token: {localStorage.getItem("access_token") || "none"}</div>
       <div>Stored uchat_token: {localStorage.getItem(TOKEN_KEY) || "none"}</div>
       <div>React token state: {token ? `${token.slice(0, 24)}…` : "none"}</div>
-      <div>ready: {String(ready)}</div>
+      <div>authReady: {String(authReady)}</div>
     </div>
   );
 
-  if (!ready) {
+  if (!authReady) {
     return (
       <>
         {debugStrip}
+        <div style={{ color: "white", padding: 20, paddingTop: 120 }}>
+          Initializing session…
+        </div>
       </>
     );
   }
