@@ -11,7 +11,6 @@ ${inviteLink}`;
 
 /** Opens WhatsApp with a prefilled message. Uses full navigation on mobile to avoid popup issues. */
 export function openWhatsAppShare(whatsappUrl: string): void {
-  console.log("WhatsApp URL:", whatsappUrl);
   const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
   if (isMobile) {
     window.location.href = whatsappUrl;

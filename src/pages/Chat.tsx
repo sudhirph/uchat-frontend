@@ -13,7 +13,7 @@ import {
   INVITE_PENDING_PEER_KEY,
   openWhatsAppShare,
 } from "../utils/invite";
-import { API_BASE_URL, wsUrlForUser } from "../config";
+import { wsUrlForUser } from "../config";
 import { ChatWindow } from "../components/ChatWindow";
 import { LanguageSelector } from "../components/LanguageSelector";
 import { MessageInput } from "../components/MessageInput";
@@ -25,24 +25,14 @@ export function ChatPage() {
   /** Session bootstrap finished (URL token read → localStorage, URL cleaned). */
   const [authReady, setAuthReady] = useState(false);
   const [token, setToken] = useState<string | null>(null);
-  /** TEMP: ?token= for on-screen debug (remove after incident) */
-  const [debugUrlToken, setDebugUrlToken] = useState<string | null>(() =>
-    typeof window !== "undefined"
-      ? new URLSearchParams(window.location.search).get("token")
-      : null
-  );
 
   /* Runs synchronously before paint and before any useEffect — avoids auth races */
   useLayoutEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const fromUrl = params.get("token");
-    console.log("Token from URL:", fromUrl);
-    setDebugUrlToken(fromUrl);
     if (fromUrl) {
       const t = decodeURIComponent(fromUrl);
       localStorage.setItem(TOKEN_KEY, t);
-      console.log("Token stored from URL:", t);
-      console.log("Token stored successfully", TOKEN_KEY);
       const u = new URL(window.location.href);
       u.searchParams.delete("token");
       const path = u.pathname + (u.search ? u.search : "") + u.hash;
@@ -82,6 +72,14 @@ export function ChatPage() {
   }, [peer]);
 
   const connectWs = useCallback((userId: number, accessToken: string) => {
+    const prev = wsRef.current;
+    if (
+      prev !== null &&
+      (prev.readyState === WebSocket.OPEN ||
+        prev.readyState === WebSocket.CONNECTING)
+    ) {
+      console.warn("WS reconnecting...");
+    }
     wsRef.current?.close();
     const url = wsUrlForUser(userId, accessToken);
     const ws = new WebSocket(url);
@@ -116,8 +114,10 @@ export function ChatPage() {
         /* ignore */
       }
     };
-    ws.onerror = () =>
+    ws.onerror = (ev) => {
+      console.error("WS error", ev);
       setError("Couldn’t stay connected. Check your internet and try refreshing.");
+    };
     wsRef.current = ws;
   }, []);
 
@@ -143,6 +143,7 @@ export function ChatPage() {
     return () => {
       cancelled = true;
       wsRef.current?.close();
+      wsRef.current = null;
     };
   }, [authReady, token, navigate, connectWs]);
 
@@ -258,58 +259,24 @@ export function ChatPage() {
     }
   };
 
-  /* TEMP debug strip — remove after production incident */
-  const debugStrip = (
-    <div
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        width: "100%",
-        background: "black",
-        color: "lime",
-        padding: "8px",
-        fontSize: "12px",
-        zIndex: 9999,
-        wordBreak: "break-all",
-      }}
-    >
-      <div>API (VITE_API_BASE_URL): {String(import.meta.env.VITE_API_BASE_URL || "unset")}</div>
-      <div>API (resolved): {API_BASE_URL}</div>
-      <div>URL token (?token=): {debugUrlToken || "none"}</div>
-      <div>
-        Stored {TOKEN_KEY}: {localStorage.getItem(TOKEN_KEY) || "none"}
-      </div>
-      <div>React token state: {token ? `${token.slice(0, 24)}…` : "none"}</div>
-      <div>authReady: {String(authReady)}</div>
-    </div>
-  );
-
   if (!authReady) {
     return (
-      <>
-        {debugStrip}
-        <div style={{ color: "white", padding: 20, paddingTop: 120 }}>
-          Initializing session…
-        </div>
-      </>
+      <div className="px-5 py-8 text-white">
+        Initializing session…
+      </div>
     );
   }
 
   if (!me) {
     return (
-      <>
-        {debugStrip}
-        <div className="flex flex-1 items-center justify-center text-gray-400" style={{ paddingTop: 120 }}>
-          One moment…
-        </div>
-      </>
+      <div className="flex flex-1 items-center justify-center px-4 text-gray-400">
+        One moment…
+      </div>
     );
   }
 
   return (
-    <div className="flex h-full flex-col" style={{ paddingTop: 120 }}>
-      {debugStrip}
+    <div className="flex h-full flex-col">
       <header className="flex flex-shrink-0 flex-wrap items-center justify-between gap-3 border-b border-gray-800 bg-chat-panel px-4 py-3">
         <div>
           <h1 className="text-lg font-semibold text-white">UChat</h1>
