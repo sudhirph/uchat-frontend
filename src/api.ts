@@ -5,16 +5,6 @@ import type { ChatMessage, User } from "./types";
 const NGROK_SKIP_BROWSER_WARNING = { "ngrok-skip-browser-warning": "true" } as const;
 
 function authHeaders(token: string): HeadersInit {
-  /* TEMP debug — remove after incident */
-  console.log("API using Bearer token (arg):", token);
-  console.log(
-    "API localStorage access_token:",
-    localStorage.getItem("access_token") ? "present" : "none"
-  );
-  console.log(
-    "API localStorage uchat_token:",
-    localStorage.getItem("uchat_token") ? "present" : "none"
-  );
   return {
     ...NGROK_SKIP_BROWSER_WARNING,
     Authorization: `Bearer ${token}`,

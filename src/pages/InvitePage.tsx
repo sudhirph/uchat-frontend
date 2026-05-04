@@ -2,8 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { acceptInviteToken } from "../api";
 import { INVITE_PENDING_PEER_KEY } from "../utils/invite";
-
-const TOKEN_KEY = "uchat_token";
+import { TOKEN_KEY } from "../auth";
 
 export function InvitePage() {
   const { token: tokenParam } = useParams<{ token: string }>();

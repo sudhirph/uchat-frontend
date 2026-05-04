@@ -18,8 +18,7 @@ import { ChatWindow } from "../components/ChatWindow";
 import { LanguageSelector } from "../components/LanguageSelector";
 import { MessageInput } from "../components/MessageInput";
 import type { ChatMessage, User } from "../types";
-
-const TOKEN_KEY = "uchat_token";
+import { TOKEN_KEY } from "../auth";
 
 export function ChatPage() {
   const navigate = useNavigate();
@@ -43,7 +42,7 @@ export function ChatPage() {
       const t = decodeURIComponent(fromUrl);
       localStorage.setItem(TOKEN_KEY, t);
       console.log("Token stored from URL:", t);
-      console.log("Token stored successfully (uchat_token)");
+      console.log("Token stored successfully", TOKEN_KEY);
       const u = new URL(window.location.href);
       u.searchParams.delete("token");
       const path = u.pathname + (u.search ? u.search : "") + u.hash;
@@ -264,8 +263,9 @@ export function ChatPage() {
       <div>API (VITE_API_BASE_URL): {String(import.meta.env.VITE_API_BASE_URL || "unset")}</div>
       <div>API (resolved): {API_BASE_URL}</div>
       <div>URL token (?token=): {debugUrlToken || "none"}</div>
-      <div>Stored access_token: {localStorage.getItem("access_token") || "none"}</div>
-      <div>Stored uchat_token: {localStorage.getItem(TOKEN_KEY) || "none"}</div>
+      <div>
+        Stored {TOKEN_KEY}: {localStorage.getItem(TOKEN_KEY) || "none"}
+      </div>
       <div>React token state: {token ? `${token.slice(0, 24)}…` : "none"}</div>
       <div>authReady: {String(authReady)}</div>
     </div>
