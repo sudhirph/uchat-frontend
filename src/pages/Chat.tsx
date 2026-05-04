@@ -53,6 +53,19 @@ export function ChatPage() {
     }
     setAuthReady(true);
   }, []);
+
+  /** Keep localStorage aligned with session token (Strict Mode / failed writes / catch path). */
+  useEffect(() => {
+    if (!authReady || !token) return;
+    try {
+      if (localStorage.getItem(TOKEN_KEY) !== token) {
+        localStorage.setItem(TOKEN_KEY, token);
+      }
+    } catch {
+      /* quota / private mode */
+    }
+  }, [authReady, token]);
+
   const [me, setMe] = useState<User | null>(null);
   const [peerEmail, setPeerEmail] = useState("");
   const [peer, setPeer] = useState<User | null>(null);
@@ -122,6 +135,7 @@ export function ChatPage() {
         setMe(u);
         connectWs(u.id, token);
       } catch {
+        setToken(null);
         localStorage.removeItem(TOKEN_KEY);
         navigate("/login", { replace: true });
       }
@@ -308,6 +322,7 @@ export function ChatPage() {
         <button
           type="button"
           onClick={() => {
+            setToken(null);
             localStorage.removeItem(TOKEN_KEY);
             navigate("/", { replace: true });
           }}
