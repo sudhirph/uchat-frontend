@@ -36,6 +36,25 @@ export async function loginRequest(email: string): Promise<LoginResponse> {
   return r.json() as Promise<LoginResponse>;
 }
 
+/** Exchange magic-link JWT for access JWT (used when /chat?token= is a magic token). */
+export async function exchangeMagicForAccess(magicToken: string): Promise<string> {
+  const r = await fetch(`${API_BASE_URL}/auth/exchange-magic`, {
+    method: "POST",
+    headers: {
+      ...NGROK_SKIP_BROWSER_WARNING,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ token: magicToken }),
+  });
+  if (!r.ok) {
+    const body = await r.json().catch(() => ({}));
+    console.error("POST /auth/exchange-magic failed", r.status, body);
+    throw new Error("Magic exchange failed");
+  }
+  const data = (await r.json()) as { access_token: string };
+  return data.access_token;
+}
+
 export async function fetchMe(token: string): Promise<User> {
   const r = await fetch(`${API_BASE_URL}/users/me`, {
     headers: authHeaders(token),

@@ -1,7 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { loginRequest } from "../api";
-import { API_BASE_URL } from "../config";
 
 export function LoginPage() {
   const [params] = useSearchParams();
@@ -13,7 +12,10 @@ export function LoginPage() {
   useEffect(() => {
     const t = params.get("token");
     if (!t) return;
-    window.location.href = `${API_BASE_URL}/auth/verify?token=${encodeURIComponent(t)}`;
+    const origin = window.location.origin;
+    window.location.replace(
+      `${origin}/chat?token=${encodeURIComponent(t)}`
+    );
   }, [params]);
 
   async function onSubmit(e: FormEvent) {
@@ -28,7 +30,8 @@ export function LoginPage() {
         setError("Something went wrong. Please try again.");
         return;
       }
-      window.location.href = `${API_BASE_URL}/auth/verify?token=${encodeURIComponent(magicToken)}`;
+      const origin = window.location.origin;
+      window.location.href = `${origin}/chat?token=${encodeURIComponent(magicToken)}`;
     } catch (err) {
       console.error("Login flow failed", err);
       setError("Something went wrong. Check your connection and try again.");

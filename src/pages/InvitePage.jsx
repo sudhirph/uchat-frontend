@@ -32,22 +32,14 @@ export default function InvitePage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || "Failed");
 
-      // Dev: follow magic link directly
-      if (data.verify_url) {
-        const url = new URL(data.verify_url);
-        const magicToken = url.searchParams.get("token");
-        if (magicToken) {
-          const vRes = await fetch(`${API}/auth/verify?token=${encodeURIComponent(magicToken)}`);
-          if (vRes.redirected) {
-            const rUrl = new URL(vRes.url);
-            const accessToken = rUrl.searchParams.get("token");
-            if (accessToken) {
-              localStorage.setItem("uchat_token", accessToken);
-              navigate("/chat");
-              return;
-            }
-          }
-        }
+      const magicToken =
+        data.magic_token ||
+        (data.verify_url
+          ? new URL(data.verify_url).searchParams.get("token")
+          : null);
+      if (magicToken) {
+        window.location.href = `${API}/auth/verify?token=${encodeURIComponent(magicToken)}`;
+        return;
       }
       navigate("/chat");
     } catch (err) {

@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   createInvite,
+  exchangeMagicForAccess,
   fetchHistory,
   fetchMe,
   fetchUserById,
@@ -22,21 +23,32 @@ import { clearToken, getToken, setToken } from "../auth";
 
 export function ChatPage() {
   const navigate = useNavigate();
-  /** Session bootstrap finished (URL token read → storage, URL cleaned). */
+  /** Session bootstrap finished (URL magic or access token → storage, URL cleaned). */
   const [authReady, setAuthReady] = useState(false);
 
-  /* Runs synchronously before paint and before any useEffect — avoids auth races */
-  useLayoutEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const urlToken = params.get("token");
-    if (urlToken) {
-      setToken(decodeURIComponent(urlToken));
-      const u = new URL(window.location.href);
-      u.searchParams.delete("token");
-      const path = u.pathname + (u.search ? u.search : "") + u.hash;
-      window.history.replaceState(null, document.title, path);
-    }
-    setAuthReady(true);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const params = new URLSearchParams(window.location.search);
+      const urlToken = params.get("token");
+      if (urlToken) {
+        const raw = decodeURIComponent(urlToken);
+        try {
+          const access = await exchangeMagicForAccess(raw);
+          if (!cancelled) setToken(access);
+        } catch {
+          /* invalid / expired token or network — leave storage unchanged */
+        }
+        const u = new URL(window.location.href);
+        u.searchParams.delete("token");
+        const path = u.pathname + (u.search ? u.search : "") + u.hash;
+        window.history.replaceState(null, document.title, path);
+      }
+      if (!cancelled) setAuthReady(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const [me, setMe] = useState<User | null>(null);

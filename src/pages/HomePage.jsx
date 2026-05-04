@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { API } from "../api";
 import "./HomePage.css";
 
@@ -15,7 +14,6 @@ export default function HomePage() {
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState("");
-  const navigate = useNavigate();
 
   async function handleLogin(e) {
     e.preventDefault();
@@ -31,23 +29,14 @@ export default function HomePage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || "Login failed");
 
-      // Dev convenience: if verify_url returned, follow it directly
-      if (data.verify_url) {
-        const url = new URL(data.verify_url);
-        const magicToken = url.searchParams.get("token");
-        if (magicToken) {
-          const vRes = await fetch(`${API}/auth/verify?token=${encodeURIComponent(magicToken)}`);
-          // verify redirects to /chat?token=... — extract token from redirect
-          if (vRes.redirected) {
-            const rUrl = new URL(vRes.url);
-            const accessToken = rUrl.searchParams.get("token");
-            if (accessToken) {
-              localStorage.setItem("uchat_token", accessToken);
-              navigate("/chat");
-              return;
-            }
-          }
-        }
+      const magicToken =
+        data.magic_token ||
+        (data.verify_url
+          ? new URL(data.verify_url).searchParams.get("token")
+          : null);
+      if (magicToken) {
+        window.location.href = `${API}/auth/verify?token=${encodeURIComponent(magicToken)}`;
+        return;
       }
       setSent(true);
     } catch (err) {
