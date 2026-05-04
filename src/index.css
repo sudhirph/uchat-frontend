@@ -1,13 +1,11 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-html,
-body,
-#root {
+html, body, #root {
   height: 100%;
+  background: #0b0f14;
+  color: #e8e8e8;
+  -webkit-font-smoothing: antialiased;
 }
 
-body {
-  @apply bg-chat-bg text-gray-100 antialiased;
-}
+button { font-family: inherit; }
+input, select, textarea { font-family: inherit; }
