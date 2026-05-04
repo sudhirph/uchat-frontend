@@ -1,6 +1,9 @@
 import { API_BASE_URL } from "./config";
 import type { ChatMessage, User } from "./types";
 
+/** Avoid ngrok free-tier HTML interstitial on programmatic fetches. */
+const NGROK_SKIP_BROWSER_WARNING = { "ngrok-skip-browser-warning": "true" } as const;
+
 function authHeaders(token: string): HeadersInit {
   /* TEMP debug — remove after incident */
   console.log("API using Bearer token (arg):", token);
@@ -13,6 +16,7 @@ function authHeaders(token: string): HeadersInit {
     localStorage.getItem("uchat_token") ? "present" : "none"
   );
   return {
+    ...NGROK_SKIP_BROWSER_WARNING,
     Authorization: `Bearer ${token}`,
     "Content-Type": "application/json",
   };
@@ -28,7 +32,10 @@ export type LoginResponse = {
 export async function loginRequest(email: string): Promise<LoginResponse> {
   const r = await fetch(`${API_BASE_URL}/auth/login`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      ...NGROK_SKIP_BROWSER_WARNING,
+      "Content-Type": "application/json",
+    },
     body: JSON.stringify({ email }),
   });
   if (!r.ok) {
@@ -93,7 +100,8 @@ export async function acceptInviteToken(
   inviteToken: string
 ): Promise<{ inviter_user_id: number }> {
   const r = await fetch(
-    `${API_BASE_URL}/invite/accept?token=${encodeURIComponent(inviteToken)}`
+    `${API_BASE_URL}/invite/accept?token=${encodeURIComponent(inviteToken)}`,
+    { headers: { ...NGROK_SKIP_BROWSER_WARNING } }
   );
   if (!r.ok) {
     const err = await r.json().catch(() => ({}));
