@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { acceptInviteToken } from "../api";
+import { getToken } from "../auth";
 import { INVITE_PENDING_PEER_KEY } from "../utils/invite";
-import { TOKEN_KEY } from "../auth";
 
 export function InvitePage() {
   const { token: tokenParam } = useParams<{ token: string }>();
@@ -21,7 +21,7 @@ export function InvitePage() {
         const { inviter_user_id } = await acceptInviteToken(raw);
         if (cancelled) return;
         sessionStorage.setItem(INVITE_PENDING_PEER_KEY, String(inviter_user_id));
-        const hasSession = localStorage.getItem(TOKEN_KEY);
+        const hasSession = getToken();
         navigate(hasSession ? "/chat" : "/login?from=invite", { replace: true });
       } catch {
         if (!cancelled) {

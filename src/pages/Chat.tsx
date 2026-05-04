@@ -18,43 +18,26 @@ import { ChatWindow } from "../components/ChatWindow";
 import { LanguageSelector } from "../components/LanguageSelector";
 import { MessageInput } from "../components/MessageInput";
 import type { ChatMessage, User } from "../types";
-import { TOKEN_KEY } from "../auth";
+import { clearToken, getToken, setToken } from "../auth";
 
 export function ChatPage() {
   const navigate = useNavigate();
-  /** Session bootstrap finished (URL token read → localStorage, URL cleaned). */
+  /** Session bootstrap finished (URL token read → storage, URL cleaned). */
   const [authReady, setAuthReady] = useState(false);
-  const [token, setToken] = useState<string | null>(null);
 
   /* Runs synchronously before paint and before any useEffect — avoids auth races */
   useLayoutEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const fromUrl = params.get("token");
-    if (fromUrl) {
-      const t = decodeURIComponent(fromUrl);
-      localStorage.setItem(TOKEN_KEY, t);
+    const urlToken = params.get("token");
+    if (urlToken) {
+      setToken(decodeURIComponent(urlToken));
       const u = new URL(window.location.href);
       u.searchParams.delete("token");
       const path = u.pathname + (u.search ? u.search : "") + u.hash;
       window.history.replaceState(null, document.title, path);
-      setToken(t);
-    } else {
-      setToken(localStorage.getItem(TOKEN_KEY));
     }
     setAuthReady(true);
   }, []);
-
-  /** Keep localStorage aligned with session token (Strict Mode / failed writes / catch path). */
-  useEffect(() => {
-    if (!authReady || !token) return;
-    try {
-      if (localStorage.getItem(TOKEN_KEY) !== token) {
-        localStorage.setItem(TOKEN_KEY, token);
-      }
-    } catch {
-      /* quota / private mode */
-    }
-  }, [authReady, token]);
 
   const [me, setMe] = useState<User | null>(null);
   const [peerEmail, setPeerEmail] = useState("");
@@ -63,6 +46,9 @@ export function ChatPage() {
   const [error, setError] = useState<string | null>(null);
   const [peerTyping, setPeerTyping] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
+  const wsStoppedRef = useRef(false);
+  const wsReconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const wsUserIdRef = useRef<number | null>(null);
   const peerRef = useRef<User | null>(null);
   const typingSendRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const typingHideRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -71,18 +57,29 @@ export function ChatPage() {
     peerRef.current = peer;
   }, [peer]);
 
-  const connectWs = useCallback((userId: number, accessToken: string) => {
-    const prev = wsRef.current;
-    if (
-      prev !== null &&
-      (prev.readyState === WebSocket.OPEN ||
-        prev.readyState === WebSocket.CONNECTING)
-    ) {
-      console.warn("WS reconnecting...");
+  const connectWs = useCallback((userId: number) => {
+    const token = getToken();
+    if (!token) return;
+
+    const cur = wsRef.current;
+    if (cur && cur.readyState === WebSocket.OPEN) return;
+    if (cur && cur.readyState === WebSocket.CONNECTING) return;
+
+    if (wsReconnectTimerRef.current) {
+      clearTimeout(wsReconnectTimerRef.current);
+      wsReconnectTimerRef.current = null;
     }
-    wsRef.current?.close();
-    const url = wsUrlForUser(userId, accessToken);
+
+    cur?.close();
+
+    wsUserIdRef.current = userId;
+    const url = wsUrlForUser(userId, token);
     const ws = new WebSocket(url);
+
+    ws.onopen = () => {
+      console.log("WS connected");
+    };
+
     ws.onmessage = (ev) => {
       try {
         const data = JSON.parse(ev.data as string) as {
@@ -114,41 +111,65 @@ export function ChatPage() {
         /* ignore */
       }
     };
+
     ws.onerror = (ev) => {
       console.error("WS error", ev);
       setError("Couldn’t stay connected. Check your internet and try refreshing.");
     };
+
+    ws.onclose = () => {
+      if (wsRef.current === ws) {
+        wsRef.current = null;
+      }
+      if (wsStoppedRef.current) return;
+      const uid = wsUserIdRef.current;
+      if (uid == null || !getToken()) return;
+      wsReconnectTimerRef.current = setTimeout(() => {
+        wsReconnectTimerRef.current = null;
+        connectWs(uid);
+      }, 2000);
+    };
+
     wsRef.current = ws;
   }, []);
 
   useEffect(() => {
     if (!authReady) return;
-    if (!token) {
+    const t = getToken();
+    if (!t) {
       navigate("/login", { replace: true });
       return;
     }
     let cancelled = false;
+    wsStoppedRef.current = false;
     (async () => {
       try {
-        const u = await fetchMe(token);
+        const u = await fetchMe(t);
         if (cancelled) return;
         setMe(u);
-        connectWs(u.id, token);
+        if (!getToken()) return;
+        connectWs(u.id);
       } catch {
-        setToken(null);
-        localStorage.removeItem(TOKEN_KEY);
+        clearToken();
         navigate("/login", { replace: true });
       }
     })();
     return () => {
       cancelled = true;
+      wsStoppedRef.current = true;
+      if (wsReconnectTimerRef.current) {
+        clearTimeout(wsReconnectTimerRef.current);
+        wsReconnectTimerRef.current = null;
+      }
       wsRef.current?.close();
       wsRef.current = null;
     };
-  }, [authReady, token, navigate, connectWs]);
+  }, [authReady, navigate, connectWs]);
 
   useEffect(() => {
-    if (!authReady || !me || !token) return;
+    if (!authReady || !me) return;
+    const t = getToken();
+    if (!t) return;
     const raw = sessionStorage.getItem(INVITE_PENDING_PEER_KEY);
     if (!raw) return;
     const peerId = parseInt(raw, 10);
@@ -159,7 +180,7 @@ export function ChatPage() {
     let cancelled = false;
     (async () => {
       try {
-        const p = await fetchUserById(token, peerId);
+        const p = await fetchUserById(t, peerId);
         if (cancelled) return;
         sessionStorage.removeItem(INVITE_PENDING_PEER_KEY);
         setPeer(p);
@@ -175,14 +196,16 @@ export function ChatPage() {
     return () => {
       cancelled = true;
     };
-  }, [authReady, me, token]);
+  }, [authReady, me]);
 
   useEffect(() => {
-    if (!authReady || !me || !token || !peer) return;
+    if (!authReady || !me || !peer) return;
+    const t = getToken();
+    if (!t) return;
     let cancelled = false;
     (async () => {
       try {
-        const hist = await fetchHistory(token, peer.id);
+        const hist = await fetchHistory(t, peer.id);
         if (!cancelled) setMessages(hist);
       } catch {
         if (!cancelled) setError("Couldn’t load messages. Try again in a moment.");
@@ -191,13 +214,14 @@ export function ChatPage() {
     return () => {
       cancelled = true;
     };
-  }, [authReady, me, token, peer?.id]);
+  }, [authReady, me, peer?.id]);
 
   const onPeerConnect = async () => {
     setError(null);
-    if (!token) return;
+    const t = getToken();
+    if (!t) return;
     try {
-      const p = await lookupUser(token, peerEmail.trim());
+      const p = await lookupUser(t, peerEmail.trim());
       setPeer(p);
       setMessages([]);
     } catch {
@@ -238,9 +262,10 @@ export function ChatPage() {
   };
 
   const onLanguageChange = async (code: string) => {
-    if (!token || !me) return;
+    const t = getToken();
+    if (!t || !me) return;
     try {
-      const u = await updateLanguage(token, code);
+      const u = await updateLanguage(t, code);
       setMe(u);
     } catch {
       setError("Couldn’t save your language. Try again.");
@@ -248,10 +273,11 @@ export function ChatPage() {
   };
 
   const shareViaWhatsApp = async () => {
-    if (!token) return;
+    const t = getToken();
+    if (!t) return;
     setError(null);
     try {
-      const { invite_link } = await createInvite(token);
+      const { invite_link } = await createInvite(t);
       const whatsappUrl = generateWhatsAppLink(invite_link);
       openWhatsAppShare(whatsappUrl);
     } catch {
@@ -289,8 +315,7 @@ export function ChatPage() {
         <button
           type="button"
           onClick={() => {
-            setToken(null);
-            localStorage.removeItem(TOKEN_KEY);
+            clearToken();
             navigate("/", { replace: true });
           }}
           className="text-sm text-gray-400 underline hover:text-white"
