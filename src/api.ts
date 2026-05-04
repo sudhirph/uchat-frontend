@@ -51,8 +51,10 @@ export async function exchangeMagicForAccess(magicToken: string): Promise<string
     console.error("POST /auth/exchange-magic failed", r.status, body);
     throw new Error("Magic exchange failed");
   }
-  const data = (await r.json()) as { access_token: string };
-  return data.access_token;
+  const data = (await r.json().catch(() => null)) as { access_token?: string } | null;
+  const access = data?.access_token;
+  if (!access) throw new Error("Magic exchange failed");
+  return access;
 }
 
 export async function fetchMe(token: string): Promise<User> {
@@ -102,7 +104,9 @@ export async function createInvite(token: string): Promise<{ invite_link: string
     const err = await r.json().catch(() => ({}));
     throw new Error((err as { detail?: string }).detail || "Could not create invite");
   }
-  return r.json();
+  const data = (await r.json().catch(() => null)) as { invite_link?: string } | null;
+  if (!data?.invite_link) throw new Error("Could not create invite");
+  return { invite_link: data.invite_link };
 }
 
 export async function acceptInviteToken(
@@ -116,7 +120,9 @@ export async function acceptInviteToken(
     const err = await r.json().catch(() => ({}));
     throw new Error((err as { detail?: string }).detail || "Invalid invite");
   }
-  return r.json();
+  const data = (await r.json().catch(() => null)) as { inviter_user_id?: number } | null;
+  if (data?.inviter_user_id == null) throw new Error("Invalid invite");
+  return { inviter_user_id: data.inviter_user_id };
 }
 
 export async function fetchUserById(

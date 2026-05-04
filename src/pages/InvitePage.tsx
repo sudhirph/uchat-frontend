@@ -5,7 +5,8 @@ import { getToken } from "../auth";
 import { INVITE_PENDING_PEER_KEY } from "../utils/invite";
 
 export function InvitePage() {
-  const { token: tokenParam } = useParams<{ token: string }>();
+  const params = useParams<{ token?: string }>();
+  const tokenParam = params?.token;
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
 
@@ -18,8 +19,9 @@ export function InvitePage() {
     let cancelled = false;
     (async () => {
       try {
-        const { inviter_user_id } = await acceptInviteToken(raw);
-        if (cancelled) return;
+        const accepted = await acceptInviteToken(raw);
+        const inviter_user_id = accepted?.inviter_user_id;
+        if (cancelled || inviter_user_id == null) return;
         sessionStorage.setItem(INVITE_PENDING_PEER_KEY, String(inviter_user_id));
         const hasSession = getToken();
         navigate(hasSession ? "/chat" : "/login?from=invite", { replace: true });

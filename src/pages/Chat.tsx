@@ -289,7 +289,12 @@ export function ChatPage() {
     if (!t) return;
     setError(null);
     try {
-      const { invite_link } = await createInvite(t);
+      const created = await createInvite(t);
+      const invite_link = created?.invite_link;
+      if (!invite_link) {
+        setError("Couldn’t create a share link. Try again.");
+        return;
+      }
       const whatsappUrl = generateWhatsAppLink(invite_link);
       openWhatsAppShare(whatsappUrl);
     } catch {
