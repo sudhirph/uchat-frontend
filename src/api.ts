@@ -4,6 +4,25 @@ import type { ChatMessage, User } from "./types";
 /** Avoid ngrok free-tier HTML interstitial on programmatic fetches. */
 const NGROK_SKIP_BROWSER_WARNING = { "ngrok-skip-browser-warning": "true" } as const;
 
+const DEFAULT_FETCH_TIMEOUT_MS = 15_000;
+
+function fetchWithTimeout(
+  input: RequestInfo | URL,
+  init: RequestInit = {},
+  timeoutMs = DEFAULT_FETCH_TIMEOUT_MS
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const outer = init.signal;
+  if (outer) {
+    if (outer.aborted) controller.abort();
+    else outer.addEventListener("abort", () => controller.abort(), { once: true });
+  }
+  return fetch(input, { ...init, signal: controller.signal }).finally(() =>
+    clearTimeout(timer)
+  );
+}
+
 async function responseJson<T>(r: Response): Promise<T | null> {
   try {
     const text = await r.text();
@@ -45,7 +64,7 @@ export type LoginResponse = {
 };
 
 export async function loginRequest(email: string): Promise<LoginResponse> {
-  const r = await fetch(`${API_BASE_URL}/auth/login`, {
+  const r = await fetchWithTimeout(`${API_BASE_URL}/auth/login`, {
     method: "POST",
     headers: {
       ...NGROK_SKIP_BROWSER_WARNING,
@@ -65,7 +84,7 @@ export async function loginRequest(email: string): Promise<LoginResponse> {
 
 /** Exchange magic-link JWT for access JWT (used when /chat?token= is a magic token). */
 export async function exchangeMagicForAccess(magicToken: string): Promise<string> {
-  const r = await fetch(`${API_BASE_URL}/auth/exchange-magic`, {
+  const r = await fetchWithTimeout(`${API_BASE_URL}/auth/exchange-magic`, {
     method: "POST",
     headers: {
       ...NGROK_SKIP_BROWSER_WARNING,
@@ -85,7 +104,7 @@ export async function exchangeMagicForAccess(magicToken: string): Promise<string
 }
 
 export async function fetchMe(token: string): Promise<User> {
-  const r = await fetch(`${API_BASE_URL}/users/me`, {
+  const r = await fetchWithTimeout(`${API_BASE_URL}/users/me`, {
     headers: authHeaders(token),
   });
   if (!r.ok) throw new Error("Session expired");
@@ -94,7 +113,7 @@ export async function fetchMe(token: string): Promise<User> {
 }
 
 export async function updateLanguage(token: string, preferred_language: string) {
-  const r = await fetch(`${API_BASE_URL}/users/me`, {
+  const r = await fetchWithTimeout(`${API_BASE_URL}/users/me`, {
     method: "PATCH",
     headers: authHeaders(token),
     body: JSON.stringify({ preferred_language }),
@@ -105,7 +124,7 @@ export async function updateLanguage(token: string, preferred_language: string) 
 }
 
 export async function lookupUser(token: string, email: string): Promise<User> {
-  const r = await fetch(
+  const r = await fetchWithTimeout(
     `${API_BASE_URL}/users/lookup?email=${encodeURIComponent(email)}`,
     { headers: authHeaders(token) }
   );
@@ -118,7 +137,7 @@ export async function fetchHistory(
   token: string,
   otherUserId: number
 ): Promise<ChatMessage[]> {
-  const r = await fetch(`${API_BASE_URL}/messages/${otherUserId}`, {
+  const r = await fetchWithTimeout(`${API_BASE_URL}/messages/${otherUserId}`, {
     headers: authHeaders(token),
   });
   if (!r.ok) throw new Error("Could not load messages");
@@ -128,7 +147,7 @@ export async function fetchHistory(
 }
 
 export async function createInvite(token: string): Promise<{ invite_link: string }> {
-  const r = await fetch(`${API_BASE_URL}/invite/create`, {
+  const r = await fetchWithTimeout(`${API_BASE_URL}/invite/create`, {
     method: "POST",
     headers: authHeaders(token),
   });
@@ -144,7 +163,7 @@ export async function createInvite(token: string): Promise<{ invite_link: string
 export async function acceptInviteToken(
   inviteToken: string
 ): Promise<{ inviter_user_id: number }> {
-  const r = await fetch(
+  const r = await fetchWithTimeout(
     `${API_BASE_URL}/invite/accept?token=${encodeURIComponent(inviteToken)}`,
     { headers: { ...NGROK_SKIP_BROWSER_WARNING } }
   );
@@ -161,7 +180,7 @@ export async function fetchUserById(
   token: string,
   userId: number
 ): Promise<User> {
-  const r = await fetch(`${API_BASE_URL}/users/by-id/${userId}`, {
+  const r = await fetchWithTimeout(`${API_BASE_URL}/users/by-id/${userId}`, {
     headers: authHeaders(token),
   });
   if (!r.ok) throw new Error("User not found");
