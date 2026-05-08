@@ -26,8 +26,14 @@ export function AuthProvider({ children }) {
       setAuthReady(true);
       return;
     }
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 6000);
     fetch(`${API}/users/me`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "ngrok-skip-browser-warning": "true",
+      },
+      signal: controller.signal,
     })
       .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
       .then((u) => setUser(u))
@@ -36,7 +42,14 @@ export function AuthProvider({ children }) {
         setToken(null);
         setUser(null);
       })
-      .finally(() => setAuthReady(true));
+      .finally(() => {
+        clearTimeout(timeout);
+        setAuthReady(true);
+      });
+    return () => {
+      clearTimeout(timeout);
+      controller.abort();
+    };
   }, [token]);
 
   function signOut() {

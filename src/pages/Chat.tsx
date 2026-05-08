@@ -28,28 +28,38 @@ export function ChatPage() {
 
   useEffect(() => {
     let cancelled = false;
+    const withTimeout = <T,>(p: Promise<T>, ms: number): Promise<T> =>
+      Promise.race([
+        p,
+        new Promise<T>((_, reject) =>
+          setTimeout(() => reject(new Error("timeout")), ms)
+        ),
+      ]);
     (async () => {
-      const params = new URLSearchParams(window.location.search);
-      const urlToken = params.get("token");
-      if (urlToken) {
-        let raw: string;
         try {
-          raw = decodeURIComponent(urlToken);
-        } catch {
-          raw = urlToken;
+        const params = new URLSearchParams(window.location.search);
+        const urlToken = params.get("token");
+        if (urlToken) {
+          let raw: string;
+          try {
+            raw = decodeURIComponent(urlToken);
+          } catch {
+            raw = urlToken;
+          }
+          try {
+            const access = await withTimeout(exchangeMagicForAccess(raw), 6000);
+            if (!cancelled) setToken(access);
+          } catch {
+            /* invalid / expired token or network — leave storage unchanged */
+          }
+          const u = new URL(window.location.href);
+          u.searchParams.delete("token");
+          const path = u.pathname + (u.search ? u.search : "") + u.hash;
+          window.history.replaceState(null, document.title, path);
         }
-        try {
-          const access = await exchangeMagicForAccess(raw);
-          if (!cancelled) setToken(access);
-        } catch {
-          /* invalid / expired token or network — leave storage unchanged */
-        }
-        const u = new URL(window.location.href);
-        u.searchParams.delete("token");
-        const path = u.pathname + (u.search ? u.search : "") + u.hash;
-        window.history.replaceState(null, document.title, path);
+      } finally {
+        if (!cancelled) setAuthReady(true);
       }
-      if (!cancelled) setAuthReady(true);
     })();
     return () => {
       cancelled = true;
