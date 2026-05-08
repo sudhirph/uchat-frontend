@@ -32,13 +32,9 @@ export default function InvitePage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || "Failed");
 
-      const magicToken =
-        data.magic_token ||
-        (data.verify_url
-          ? new URL(data.verify_url).searchParams.get("token")
-          : null);
-      if (magicToken) {
-        window.location.href = `${API}/auth/verify?token=${encodeURIComponent(magicToken)}`;
+      // Navigate browser directly to verify URL — backend redirects to /chat?token=
+      if (data.verify_url) {
+        window.location.href = data.verify_url;
         return;
       }
       navigate("/chat");

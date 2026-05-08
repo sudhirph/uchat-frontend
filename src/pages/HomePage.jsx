@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { API } from "../api";
 import "./HomePage.css";
 
@@ -14,6 +15,7 @@ export default function HomePage() {
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState("");
+  const navigate = useNavigate();
 
   async function handleLogin(e) {
     e.preventDefault();
@@ -29,15 +31,15 @@ export default function HomePage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || "Login failed");
 
-      const magicToken =
-        data.magic_token ||
-        (data.verify_url
-          ? new URL(data.verify_url).searchParams.get("token")
-          : null);
-      if (magicToken) {
-        window.location.href = `${API}/auth/verify?token=${encodeURIComponent(magicToken)}`;
+      // The backend returns verify_url (magic link).
+      // We navigate the browser directly to it — the backend will redirect
+      // back to /chat?token=<jwt> which AuthContext picks up.
+      if (data.verify_url) {
+        window.location.href = data.verify_url;
         return;
       }
+
+      // Production flow: magic link sent via email
       setSent(true);
     } catch (err) {
       setError(err.message);

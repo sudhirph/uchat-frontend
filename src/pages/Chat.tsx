@@ -32,7 +32,12 @@ export function ChatPage() {
       const params = new URLSearchParams(window.location.search);
       const urlToken = params.get("token");
       if (urlToken) {
-        const raw = decodeURIComponent(urlToken);
+        let raw: string;
+        try {
+          raw = decodeURIComponent(urlToken);
+        } catch {
+          raw = urlToken;
+        }
         try {
           const access = await exchangeMagicForAccess(raw);
           if (!cancelled) setToken(access);
@@ -94,8 +99,12 @@ export function ChatPage() {
 
     ws.onmessage = (ev) => {
       try {
-        const data = JSON.parse(ev.data as string) as {
-          type: string;
+        const parsed: unknown = JSON.parse(String(ev.data));
+        if (parsed == null || typeof parsed !== "object" || Array.isArray(parsed)) {
+          return;
+        }
+        const data = parsed as {
+          type?: string;
           message?: ChatMessage;
           sender_id?: number;
         };

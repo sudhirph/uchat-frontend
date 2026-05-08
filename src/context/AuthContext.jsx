@@ -4,21 +4,20 @@ import { API } from "../api";
 const AuthCtx = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [token, setToken] = useState(() => localStorage.getItem("uchat_token"));
-  const [user, setUser] = useState(null);
-  const [authReady, setAuthReady] = useState(false);
-
-  // On mount, pick up ?token= from URL (magic link redirect)
-  useEffect(() => {
+  const [token, setToken] = useState(() => {
+    // Check URL first (magic link redirect lands here with ?token=)
     const params = new URLSearchParams(window.location.search);
     const urlToken = params.get("token");
     if (urlToken) {
       localStorage.setItem("uchat_token", urlToken);
-      setToken(urlToken);
-      // Clean URL
+      // Clean URL immediately
       window.history.replaceState({}, "", window.location.pathname);
+      return urlToken;
     }
-  }, []);
+    return localStorage.getItem("uchat_token");
+  });
+  const [user, setUser] = useState(null);
+  const [authReady, setAuthReady] = useState(false);
 
   // Fetch /users/me whenever token changes
   useEffect(() => {

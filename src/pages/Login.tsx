@@ -2,8 +2,14 @@ import { FormEvent, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { loginRequest } from "../api";
 
+const FALLBACK_SEARCH_PARAMS = new URLSearchParams();
+
 export function LoginPage() {
-  const [params] = useSearchParams();
+  const searchParamsHook = useSearchParams();
+  const params =
+    Array.isArray(searchParamsHook) && searchParamsHook[0] instanceof URLSearchParams
+      ? searchParamsHook[0]
+      : FALLBACK_SEARCH_PARAMS;
   const fromInvite = params.get("from") === "invite";
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);

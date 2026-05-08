@@ -28,7 +28,12 @@ function initials(email) {
 }
 
 export default function ChatPage() {
-  const { token, user, authReady, signOut, updateUser } = useAuth();
+  const auth = useAuth() || {};
+  const token = auth.token;
+  const user = auth.user;
+  const authReady = auth.authReady ?? false;
+  const signOut = auth.signOut ?? (() => {});
+  const updateUser = auth.updateUser ?? (() => {});
   const navigate = useNavigate();
 
   const [peer, setPeer] = useState(null);
@@ -220,7 +225,22 @@ export default function ChatPage() {
   }
 
   if (!authReady) return <div className="cp-loading">Loading…</div>;
-  if (!user) return null;
+  if (!user) {
+    return (
+      <div className="cp-root">
+        <div className="cp-loading" style={{ padding: "1.5rem", textAlign: "center" }}>
+          <p style={{ marginBottom: "1rem", color: "rgba(255,255,255,0.75)" }}>
+            {!token
+              ? "Sign in required — redirecting…"
+              : "Couldn’t load your profile. This link may be invalid or expired."}
+          </p>
+          <button type="button" className="cp-signout" onClick={() => navigate("/")}>
+            Back to home
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const myLang = LANGUAGES.find((l) => l.code === user.preferred_language) || LANGUAGES[0];
 

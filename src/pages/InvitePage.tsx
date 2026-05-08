@@ -8,14 +8,24 @@ export function InvitePage() {
   const params = useParams<{ token?: string }>();
   const tokenParam = params?.token;
   const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
+  const [inviterUserId, setInviterUserId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!tokenParam) {
-      navigate("/", { replace: true });
+      setLoading(false);
+      setError("Missing invite token.");
       return;
     }
-    const raw = decodeURIComponent(tokenParam);
+
+    let raw = tokenParam;
+    try {
+      raw = decodeURIComponent(tokenParam);
+    } catch {
+      raw = tokenParam;
+    }
+
     let cancelled = false;
     (async () => {
       try {
@@ -23,18 +33,29 @@ export function InvitePage() {
         const inviter_user_id = accepted?.inviter_user_id;
         if (cancelled || inviter_user_id == null) return;
         sessionStorage.setItem(INVITE_PENDING_PEER_KEY, String(inviter_user_id));
-        const hasSession = getToken();
-        navigate(hasSession ? "/chat" : "/login?from=invite", { replace: true });
+        setInviterUserId(inviter_user_id);
       } catch {
         if (!cancelled) {
           setError("This link doesn’t work anymore. Ask your friend to send a new one.");
         }
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [tokenParam, navigate]);
+  }, [tokenParam]);
+
+  const hasSession = Boolean(getToken());
+
+  if (loading) {
+    return (
+      <div className="flex min-h-full flex-col items-center justify-center text-gray-400">
+        Validating invite...
+      </div>
+    );
+  }
 
   if (error) {
     return (
@@ -52,8 +73,21 @@ export function InvitePage() {
   }
 
   return (
-    <div className="flex min-h-full flex-col items-center justify-center text-gray-400">
-      Joining conversation…
+    <div className="flex min-h-full flex-col items-center justify-center px-4 text-center text-gray-300">
+      <h1 className="text-lg font-semibold text-white">Invite is valid</h1>
+      <p className="mt-2 text-sm">
+        inviter_user_id: {inviterUserId ?? "unknown"}
+      </p>
+      <p className="mt-1 text-sm">session: {hasSession ? "found" : "not found"}</p>
+      <button
+        type="button"
+        className="mt-6 rounded bg-chat-accent px-4 py-2 font-medium text-chat-bg"
+        onClick={() =>
+          navigate(hasSession ? "/chat" : "/login?from=invite", { replace: true })
+        }
+      >
+        Continue
+      </button>
     </div>
   );
 }

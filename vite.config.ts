@@ -10,8 +10,5 @@ export default defineConfig({
     // Allow external hosts (ngrok, etc.)
     allowedHosts: true,
     // ngrok HTTPS: HMR websocket uses same host on 443
-    hmr: {
-      clientPort: 443,
-    },
   },
 });
